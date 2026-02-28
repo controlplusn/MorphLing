@@ -21,15 +21,18 @@ class MorphlingTokenizer:
         self.REPEAT_TAG_LEN = len(self.REPEAT_TAG)
         self.CAPITAL_TAG_LEN = len(self.CAPITAL_TAG)
 
-        self.PUNCTS_SPACE_AFTER = set(".,?!:;)\"']")
-        self.PUNCTS_SPACE_BEFORE = set("(\"'[")
+        self.PUNCTS_SPACE_AFTER = set(".,?!:;)']\"")
+        self.PUNCTS_SPACE_BEFORE = set("('[")
         self.PUNCTUATION_CHARS = self.PUNCTS_SPACE_AFTER | self.PUNCTS_SPACE_BEFORE
 
         self.VOWEL_CHARS = set("aeiou")
 
     def _tokenize_word(self, word: str) -> list:
+        # TODO: normalize single quotes to double quotes if context is quoting and not contractions
+        if word == r"``" or word == r"''":
+            return ['"']
+
         # TODO: capitalization check, not robust but fast
-        # TODO: punctuations, handle quotations
         is_capital = word[0].isupper() and (len(word) == 1 or word[-1].islower())
 
         stem = stemmer.get_stem(word)
@@ -179,20 +182,36 @@ class MorphlingTokenizer:
             word_token_buf.append(token)
 
         concat = []
+        no_space_next = False
+        opened_quotes = False
         for word in words:
             if len(word) == 1 and word in self.PUNCTUATION_CHARS:
-                if word in self.PUNCTS_SPACE_AFTER:
+                if word == '"':
+                    if opened_quotes:
+                        concat.append(word)
+                    else:
+                        concat.append(" " + word)
+                        no_space_next = True
+
+                    opened_quotes = not opened_quotes
+
+                elif word in self.PUNCTS_SPACE_AFTER:
                     concat.append(word)
                 elif word in self.PUNCTS_SPACE_BEFORE:
                     concat.append(" " + word)
+                    no_space_next = True
             else:
-                concat.append(" " + word)
+                if no_space_next:
+                    concat.append(word)
+                    no_space_next = False
+                else:
+                    concat.append(" " + word)
 
         return "".join(concat).strip()
 
 
 if __name__ == "__main__":
-    s = "Tumitigil-tigil kayo, at kung hindi ay pagbabalibagin ko kayong lahat."
+    s = 'Tumitigil-tigil kayo, at kung hindi ay "pagbabalibagin" ko "kayong" lahat.'
     # s = "aalis"
     tokenizer = MorphlingTokenizer()
 
