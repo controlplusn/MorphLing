@@ -17,18 +17,22 @@ joblib==1.5.3
 markdown-it-py==4.0.0
 mdurl==0.1.2
 nltk==3.9.3
+numpy==2.4.2
 packaging==26.0
 Pygments==2.19.2
 PyYAML==6.0.3
 regex==2026.2.19
 requests==2.32.5
 rich==14.3.3
+safetensors==0.7.0
 shellingham==1.5.4
 soupsieve==2.8.3
 tabulate==0.9.0
 tglstemmer @ git+https://github.com/andrianllmm/tagalog-stemmer.git@4a943815b8f00bf8efa6fa324eed686749f75428
 tokenizers==0.22.2
 tqdm==4.67.3
+transformers==5.2.0
 typer==0.24.1
+typer-slim==0.24.0
 typing_extensions==4.15.0
 urllib3==2.6.3
