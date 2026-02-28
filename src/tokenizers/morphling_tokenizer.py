@@ -25,7 +25,10 @@ class MorphlingTokenizer:
 
         self.PUNCTS_SPACE_AFTER = set(".,?!:;)]\"'")
         self.PUNCTS_SPACE_BEFORE = set("([")
-        self.PUNCTUATION_CHARS = self.PUNCTS_SPACE_AFTER | self.PUNCTS_SPACE_BEFORE
+        self.PUNCTS_NO_SPACE = set("\n\t")
+        self.PUNCTUATION_CHARS = (
+            self.PUNCTS_SPACE_AFTER | self.PUNCTS_SPACE_BEFORE | self.PUNCTS_NO_SPACE
+        )
 
         self.VOWEL_CHARS = set("aeiou")
 
@@ -36,6 +39,12 @@ class MorphlingTokenizer:
         self.UNK_TOKEN = "<unk>"
 
     def _tokenize_word(self, word: str) -> list:
+        if len(word) == 1:
+            if word.isupper():
+                return [word, self.CAPITAL_TAG]
+            else:
+                return [word]
+
         # TODO: normalize single quotes to double quotes if context is quoting and not contractions
 
         # TODO: capitalization check, not robust but fast
@@ -207,6 +216,10 @@ class MorphlingTokenizer:
                 elif word in self.PUNCTS_SPACE_BEFORE:
                     concat.append(" " + word)
                     no_space_next = True
+                elif word in self.PUNCTS_NO_SPACE:
+                    concat.append(word)
+                    no_space_next = True
+
             else:
                 if no_space_next:
                     concat.append(word)
