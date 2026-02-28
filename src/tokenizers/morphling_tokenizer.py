@@ -34,9 +34,16 @@ class MorphlingTokenizer:
 
         self.VALID_CONTRACTIONS = set(["'y", "'t"])
 
-        self.EOS_TOKEN = "<s>"
-        self.BOS_TOKEN = "</s>"
+        self.BOS_TOKEN = "<s>"
+        self.EOS_TOKEN = "</s>"
         self.UNK_TOKEN = "<unk>"
+        self.SEQUENCE_TOKENS = set(
+            [
+                self.BOS_TOKEN,
+                self.EOS_TOKEN,
+                self.UNK_TOKEN,
+            ]
+        )
 
     def _tokenize_word(self, word: str) -> list:
         if len(word) == 1:
@@ -88,13 +95,18 @@ class MorphlingTokenizer:
         words = re.findall(r"[\w']+(?:-\w+)*|[^\w\s]|\n", s, re.UNICODE)
         return words
 
-    def tokenize(self, s: str) -> list:
+    def tokenize(self, s: str, add_bos: bool = True, add_eos: bool = True) -> list:
         words = self._split_to_words(s)
         tokens = []
+        if add_bos:
+            tokens.append(self.BOS_TOKEN)
 
         for word in words:
             word_tokens = self._tokenize_word(word)
             tokens += word_tokens
+
+        if add_eos:
+            tokens.append(self.EOS_TOKEN)
 
         return tokens
 
@@ -147,6 +159,10 @@ class MorphlingTokenizer:
         # full redup -> partial redup -> infix -> suffix -> prefix
 
         stem = word_tokens[0]
+
+        if stem in self.SEQUENCE_TOKENS:
+            return stem
+
         for i in range(1, len(word_tokens)):
             token = word_tokens[i]
             if token.endswith(self.REPEAT_TAG):
@@ -185,7 +201,7 @@ class MorphlingTokenizer:
         word_token_buf = []
         words = []
 
-        # TODO: EOS tokens should be used here instead
+        # just a trick coz lazy to write if statements
         tokens.append("tapos")
 
         for token in tokens:
