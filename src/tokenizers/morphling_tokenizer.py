@@ -1,12 +1,27 @@
 import re
-
-from nltk import word_tokenize
+import string
+from pathlib import Path
 
 from tglstemmer import stemmer
+from transformers.tokenization_python import PreTrainedTokenizer
 
 
-class MorphlingTokenizer:
-    def __init__(self):
+class MorphlingTokenizer(PreTrainedTokenizer):
+    def __init__(
+        self,
+        vocab: str | dict | list | None = None,
+        unk_token="<unk>",
+        bos_token="<s>",
+        eos_token="</s>",
+        **kwargs,
+    ):
+        module_root_dir = Path(__file__).parent.parent
+
+        self.PREFIXES_FILE = module_root_dir / "resources" / "affixes" / "prefixes.txt"
+        self.SUFFIXES_FILE = module_root_dir / "resources" / "affixes" / "suffixes.txt"
+        self.INFIXES_FILE = module_root_dir / "resources" / "affixes" / "infixes.txt"
+
+        # for O(1) identification if token is special
         self.SPECIAL_TOKEN_MARKER = "\u241f"
 
         self.PREFIX_TAG = "##PREFIX" + self.SPECIAL_TOKEN_MARKER
@@ -34,16 +49,102 @@ class MorphlingTokenizer:
 
         self.VALID_CONTRACTIONS = set(["'y", "'t"])
 
-        self.BOS_TOKEN = "<s>"
-        self.EOS_TOKEN = "</s>"
-        self.UNK_TOKEN = "<unk>"
+        self.vocab = vocab
+        if self.vocab is None:
+            self._setup_vocab(
+                unk_token=str(unk_token),
+                bos_token=str(bos_token),
+                eos_token=str(eos_token),
+            )
+
+        self.ids_to_tokens = {v: k for k, v in self.vocab.items()}
+
+        super().__init__(
+            unk_token=str(unk_token),
+            bos_token=str(bos_token),
+            eos_token=str(eos_token),
+            **kwargs,
+        )
+
         self.SEQUENCE_TOKENS = set(
             [
-                self.BOS_TOKEN,
-                self.EOS_TOKEN,
-                self.UNK_TOKEN,
+                self.bos_token,
+                self.eos_token,
+                self.unk_token,
             ]
         )
+
+    def _setup_vocab(
+        self,
+        unk_token,
+        bos_token,
+        eos_token,
+    ):
+        # TODO: load BPE vocab file first before adding the special tokens
+        # TODO: maybe have the BPE provided these tokens too
+
+        # sequence tokens
+        self.vocab = {
+            unk_token: 0,
+            bos_token: 1,
+            eos_token: 2,
+        }
+
+        # prefixes
+        with open(self.PREFIXES_FILE, "r") as f:
+            lines = f.readlines()
+            for line in lines:
+                prefix = line.strip()
+                prefix_token = prefix + self.PREFIX_TAG
+                self.vocab[prefix_token] = len(self.vocab)
+
+        # suffixes
+        with open(self.SUFFIXES_FILE, "r") as f:
+            lines = f.readlines()
+            for line in lines:
+                suffix = line.strip()
+                suffix_token = suffix + self.SUFFIX_TAG
+                self.vocab[suffix_token] = len(self.vocab)
+
+        # infixes
+        with open(self.INFIXES_FILE, "r") as f:
+            lines = f.readlines()
+            for line in lines:
+                infix = line.strip()
+                infix_token = infix + self.INFIX_TAG
+                self.vocab[infix_token] = len(self.vocab)
+
+        # full redup
+        self.vocab[self.REPEAT_TAG] = len(self.vocab)
+
+        # partial redup
+        self.vocab[self.REDUP_TAG] = len(self.vocab)
+
+        # capital
+        self.vocab[self.CAPITAL_TAG] = len(self.vocab)
+
+    def _tokenize(self, text: str) -> list:
+        words = self._split_to_words(text)
+        tokens = []
+
+        for word in words:
+            word_tokens = self._tokenize_word(word)
+            tokens += word_tokens
+
+        return tokens
+
+    def _convert_token_to_id(self, token):
+        return self.vocab.get(token, self.vocab.get(self.unk_token))
+
+    def _convert_id_to_token(self, index):
+        return self.ids_to_tokens.get(index, self.unk_token)
+
+    def get_vocab(self):
+        return self.vocab
+
+    @property
+    def vocab_size(self):
+        return len(self.vocab)
 
     def _tokenize_word(self, word: str) -> list:
         if len(word) == 1:
@@ -52,31 +153,28 @@ class MorphlingTokenizer:
             else:
                 return [word]
 
-        # TODO: normalize single quotes to double quotes if context is quoting and not contractions
-
-        # TODO: capitalization check, not robust but fast
+        # NOTE: capitalization check, not robust but fast
         is_capital = word[0].isupper() and (len(word) == 1 or word[-1].islower())
 
         stem = stemmer.get_stem(word)
         root = str(stem)
+
+        # TODO: tokens if root should be processed by BPE first
         tokens = [root]
 
         if stem.dup:
             tokens.append(self.REPEAT_TAG)
 
-        # TODO: handle single letter partial reduplication, e.g., aalis -> a + alis
         if stem.rep:
             tokens.append(self.REDUP_TAG)
 
         if stem.inf:
             tokens.append(stem.inf + self.INFIX_TAG)
 
-        # TODO: handle phoneme change and assimilation
         if stem.pre:
             tokens.append(stem.pre + self.PREFIX_TAG)
 
-        # TODO: handle phoneme change
-        # vowel loss and metathesis doesn't change meaning so its ok?
+        # phoneme change, assimilation, vowel loss, and metathesis doesn't change meaning so its ok for now
         if stem.suf:
             tokens.append(stem.suf + self.SUFFIX_TAG)
 
@@ -94,21 +192,6 @@ class MorphlingTokenizer:
         # words = word_tokenize(s)
         words = re.findall(r"[\w']+(?:-\w+)*|[^\w\s]|\n", s, re.UNICODE)
         return words
-
-    def tokenize(self, s: str, add_bos: bool = True, add_eos: bool = True) -> list:
-        words = self._split_to_words(s)
-        tokens = []
-        if add_bos:
-            tokens.append(self.BOS_TOKEN)
-
-        for word in words:
-            word_tokens = self._tokenize_word(word)
-            tokens += word_tokens
-
-        if add_eos:
-            tokens.append(self.EOS_TOKEN)
-
-        return tokens
 
     def _reconstruct_full_reduplication(self, stem: str) -> str:
         new_stem = f"{stem}-{stem}"
