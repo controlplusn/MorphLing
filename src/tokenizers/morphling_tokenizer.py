@@ -35,6 +35,9 @@ class MorphlingTokenizer(PreTrainedTokenizer):
         self.INFIXES_FILE = module_root_dir / "resources" / "affixes" / "infixes.txt"
         self.WORDLIST_FILE = module_root_dir / "resources" / "tgl_wordlist.txt"
 
+        # NOTE: MAKE SURE TO UPDATE THIS AS YOU ADD MORE SPECIAL TOKENS
+        self.SPECIAL_TOKEN_COUNT = 126
+
         self._load_wordlist()
 
         # train on corpus_file if tokenizer_file doesn't exist yet
@@ -45,7 +48,7 @@ class MorphlingTokenizer(PreTrainedTokenizer):
             self._train_bpe(
                 corpus_file=corpus_file,
                 output_file=bpe_tokenizer_file,
-                vocab_size=vocab_size,
+                vocab_size=vocab_size - self.SPECIAL_TOKEN_COUNT,
                 unk_token=str(unk_token),
                 bos_token=str(bos_token),
                 eos_token=str(eos_token),
