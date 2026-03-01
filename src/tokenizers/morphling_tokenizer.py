@@ -149,7 +149,7 @@ class MorphlingTokenizer(PreTrainedTokenizer):
     def _tokenize_word(self, word: str) -> list:
         if len(word) == 1:
             if word.isupper():
-                return [word, self.CAPITAL_TAG]
+                return [word.lower(), self.CAPITAL_TAG]
             else:
                 return [word]
 
