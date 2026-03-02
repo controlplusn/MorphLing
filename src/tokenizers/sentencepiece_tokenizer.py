@@ -1,3 +1,5 @@
+import os
+
 import sentencepiece as spm
 from transformers.models.llama import LlamaTokenizerFast
 from tokenizers import SentencePieceBPETokenizer
@@ -7,13 +9,30 @@ class SentencePieceTokenizer(LlamaTokenizerFast):
     def __init__(
         self,
         tokenizer_file: str,
+        dataset=None,
         unk_token="<unk>",
         bos_token="<s>",
         eos_token="</s>",
         add_bos_token: bool = True,
         add_eos_token: bool = False,
+        vocab_size: int = 8000,
+        min_frequency: int = 2,
         **kwargs,
     ):
+        if not os.path.exists(tokenizer_file):
+            if dataset is None:
+                raise Exception("dataset must be provided for corpus training")
+
+            self._train(
+                dataset=dataset,
+                output_file=tokenizer_file,
+                vocab_size=vocab_size,
+                unk_token=str(unk_token),
+                bos_token=str(bos_token),
+                eos_token=str(eos_token),
+                min_frequency=min_frequency,
+            )
+
         super().__init__(
             tokenizer_file=tokenizer_file,
             unk_token=str(unk_token),
@@ -26,9 +45,9 @@ class SentencePieceTokenizer(LlamaTokenizerFast):
 
         self.pad_token = self.unk_token
 
-    @staticmethod
-    def train(
-        corpus_file: str,
+    def _train(
+        self,
+        dataset,
         output_file: str,
         vocab_size: int,
         unk_token: str = "<unk>",
@@ -37,18 +56,13 @@ class SentencePieceTokenizer(LlamaTokenizerFast):
         min_frequency: int = 2,
         **kwargs,
     ):
-        def get_text_from_corpus():
-            with open(corpus_file, "r") as f:
-                lines = f.readlines()
-                lines = list(map(lambda line: line.strip(), lines))
-                batch_size = 1000
-                for i in range(0, len(lines), batch_size):
-                    batch = lines[i : i + batch_size]
-                    yield batch
+        def batch_iterator(batch_size=1000):
+            for i in range(0, len(dataset), batch_size):
+                yield dataset[i : i + batch_size]["text"]
 
         tokenizer = SentencePieceBPETokenizer()
         tokenizer.train_from_iterator(
-            get_text_from_corpus(),
+            batch_iterator(),
             vocab_size=vocab_size,
             min_frequency=min_frequency,
             show_progress=True,

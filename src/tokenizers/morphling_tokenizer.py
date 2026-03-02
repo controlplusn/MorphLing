@@ -3,6 +3,7 @@ import re
 import string
 from pathlib import Path
 
+from datasets import concatenate_datasets, Dataset
 from tglstemmer import stemmer
 from tokenizers import SentencePieceBPETokenizer
 from transformers.tokenization_python import PreTrainedTokenizer
@@ -14,7 +15,7 @@ class MorphlingTokenizer(PreTrainedTokenizer):
     def __init__(
         self,
         bpe_tokenizer_file: str,
-        corpus_file: str | None = None,
+        dataset=None,
         vocab: str | dict | list | None = None,
         unk_token="<unk>",
         bos_token="<s>",
@@ -42,11 +43,11 @@ class MorphlingTokenizer(PreTrainedTokenizer):
 
         # train on corpus_file if tokenizer_file doesn't exist yet
         if not os.path.exists(bpe_tokenizer_file):
-            if corpus_file is None:
-                raise Exception("corpus_file must be provided for corpus training")
+            if dataset is None:
+                raise Exception("dataset must be provided for corpus training")
 
             self._train_bpe(
-                corpus_file=corpus_file,
+                dataset=dataset,
                 output_file=bpe_tokenizer_file,
                 vocab_size=vocab_size - self.SPECIAL_TOKEN_COUNT,
                 unk_token=str(unk_token),
@@ -401,38 +402,30 @@ class MorphlingTokenizer(PreTrainedTokenizer):
 
         return token[0] == self.SENTENCEPIECE_SPACE
 
-    # NOTE: this could be faster and memory-efficient by lazy loading using generators
-    def _preprocess_corpus(self, corpus_file: str):
-        # first line is for telling SentencePiece to save ID for all 256 byte values
-        new_corpus = ["".join(chr(i) for i in range(256))]
+    def _preprocess(self, example):
+        line = example["text"].strip()
+        if not line:
+            return {"text": ""}
 
-        with open(corpus_file, "r") as f:
-            lines = f.readlines()
-            for line in lines:
-                line = line.strip()
-                if not line:
-                    continue
+        words = self._split_to_words(line)
 
-                words = self._split_to_words(line)
-                tokens = []
-                for word in words:
-                    if len(word) <= 1:
-                        continue
+        tokens = []
+        for word in words:
+            if len(word) <= 1:
+                continue
 
-                    stem = stemmer.get_stem(word)
-                    if stem in self.wordlist:
-                        tokens.append(stem)
-                    else:
-                        tokens.append(word)
+            stem = stemmer.get_stem(word)
+            if stem in self.wordlist:
+                tokens.append(stem)
+            else:
+                tokens.append(word)
 
-                processed = " ".join(tokens)
-                new_corpus.append(processed)
-
-        return new_corpus
+        processed = " ".join(tokens)
+        return {"text": processed}
 
     def _train_bpe(
         self,
-        corpus_file: str,
+        dataset,
         output_file: str,
         vocab_size: int,
         unk_token: str = "<unk>",
@@ -441,17 +434,30 @@ class MorphlingTokenizer(PreTrainedTokenizer):
         min_frequency: int = 2,
         **kwargs,
     ):
-        lines = self._preprocess_corpus(corpus_file=corpus_file)
+        dataset = dataset.map(
+            lambda example: self._preprocess(example),
+            remove_columns=dataset.column_names,
+            num_proc=os.cpu_count(),
+        )
 
-        def get_text_from_corpus():
-            batch_size = 1000
-            for i in range(0, len(lines), batch_size):
-                batch = lines[i : i + batch_size]
-                yield batch
+        dataset = dataset.filter(
+            lambda x: x["text"] != "",
+            num_proc=os.cpu_count(),
+        )
+
+        char_dataset = Dataset.from_dict(
+            {"text": ["".join(chr(i) for i in range(256))]}
+        )
+        dataset = concatenate_datasets([char_dataset, dataset])
+
+        def batch_iterator(batch_size=1000):
+            for i in range(0, len(dataset), batch_size):
+                yield dataset[i : i + batch_size]["text"]
 
         tokenizer = SentencePieceBPETokenizer()
+
         tokenizer.train_from_iterator(
-            get_text_from_corpus(),
+            batch_iterator(),
             vocab_size=vocab_size,
             min_frequency=min_frequency,
             show_progress=True,
