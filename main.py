@@ -1,15 +1,14 @@
 from src import MorphlingTokenizer, SentencePieceTokenizer
 
 if __name__ == "__main__":
-    s = 'Tumitigil-tigil kayo, at kung hindi ay "pagbabalibagin" ko \'yong lahat.'
+    # s = 'Tumitigil-tigil kayo, at kung hindi ay "pagbabalibagin" ko \'yong lahat.'
     # s = "Ako'y may lobo.\nLumipad nga lang sa langit tangina"
     # s = "ABCDE"
     # s = "Jose P. Rizal"
-    # s = "Ang mga prutas ng Pilipinas ay kilala sa buong mundo dahil sa kanilang matamis na lasa at natatanging amoy. Ang mangga (Mangifera indica) ay itinuturing na pambansang prutas ng Pilipinas. Ang Philippine Carabao mango ay kilala bilang isa sa pinakamataas na kalidad na mangga sa buong mundo. Ito ay matamis, malambot, at mabango na may napakagandang kulay na ginto."
+    s = "Ang mga prutas ng Pilipinas ay kilala sa buong mundo dahil sa kanilang matamis na lasa at natatanging amoy. Ang mangga (Mangifera indica) ay itinuturing na pambansang prutas ng Pilipinas. Ang Philippine Carabao mango ay kilala bilang isa sa pinakamataas na kalidad na mangga sa buong mundo. Ito ay matamis, malambot, at mabango na may napakagandang kulay na ginto."
 
-    tokenizer = MorphlingTokenizer("test2", corpus_file="dataset.txt")
-    # SentencePieceTokenizer.train("dataset.txt", "test", 1000)
-    # tokenizer = SentencePieceTokenizer("test")
+    tokenizer = MorphlingTokenizer("./data/tokenizer/morphling-8k-test.json")
+    # tokenizer = SentencePieceTokenizer("./data/tokenizer/sentencepiece-8k-test.json")
 
     tokens = tokenizer.tokenize(s)
     token_ids = tokenizer.encode(s)
