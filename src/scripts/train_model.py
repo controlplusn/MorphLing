@@ -1,10 +1,12 @@
 import math
+import os
 
 import hydra
 import torchinfo
 from datasets import load_dataset
 from huggingface_hub import login
 from omegaconf import DictConfig, OmegaConf
+from transformers.data.data_collator import DataCollatorForLanguageModeling
 from transformers.models.llama import LlamaConfig, LlamaForCausalLM
 from transformers.trainer import Trainer
 from transformers.training_args import TrainingArguments
@@ -77,13 +79,15 @@ def main(cfg: DictConfig):
     print()
     torchinfo.summary(model)
 
+    print(f"\n> Loading dataset: {cfg.dataset.path}...")
     dataset = load_dataset(
         path=cfg.dataset.path,
         name=cfg.dataset.name,
         split=cfg.dataset.split,
     )
+    print("> Loaded dataset.\n")
 
-    args = TrainingArguments(
+    training_args = TrainingArguments(
         output_dir=cfg.training.output_dir,
         # training duration and batch size
         per_device_train_batch_size=cfg.training.train_batch_size,
@@ -113,8 +117,49 @@ def main(cfg: DictConfig):
         hub_strategy="all_checkpoints",
     )
 
-    print("\n=== Training Configuration ===")
+    print("=== Training Configuration ===")
     print(OmegaConf.to_yaml(cfg.training))
+
+    def group_texts(examples):
+        block_size = cfg.model.context_window
+
+        concatenated_examples = {k: sum(examples[k], []) for k in examples.keys()}
+        total_length = len(concatenated_examples[list(examples.keys())[0]])
+        total_length = ((total_length + block_size - 1) // block_size) * block_size
+
+        result = {
+            k: [t[i : i + block_size] for i in range(0, total_length, block_size)]
+            for k, t in concatenated_examples.items()
+        }
+
+        result["labels"] = result["input_ids"].copy()
+        return result
+
+    dataset = dataset.map(
+        group_texts,
+        batched=True,
+        batch_size=1000,
+        num_proc=os.cpu_count(),
+        remove_columns=dataset.column_names,
+    )
+
+    data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
+
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=dataset,
+        data_collator=data_collator,
+    )
+
+    print("> Beginning training...")
+
+    trainer.train(resume_from_checkpoint=cfg.resume_from_checkpoint)
+
+    trainer.save_model(cfg.training.output_dir)
+    tokenizer.save_pretrained(cfg.training.output_dir)
+
+    print(f"> Training complete. Saved to {cfg.training.output_dir}")
 
 
 if __name__ == "__main__":

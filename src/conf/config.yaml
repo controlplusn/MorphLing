@@ -6,3 +6,4 @@ defaults:
   - training: "debug.yaml"
 
 tokenizer_file: "data/tokenizer/test.json"
+resume_from_checkpoint: false
