@@ -3,6 +3,7 @@ import math
 import hydra
 import torchinfo
 from datasets import load_dataset
+from huggingface_hub import login
 from omegaconf import DictConfig, OmegaConf
 from transformers.models.llama import LlamaConfig, LlamaForCausalLM
 
@@ -37,6 +38,18 @@ tokenizer_registry = {
 def main(cfg: DictConfig):
     print("=== Active Configuration ===")
     print(OmegaConf.to_yaml(cfg))
+
+    if "hf_token" not in cfg:
+        raise Exception(
+            "hf_token is required, add +hf_token=YOUR_TOKEN_HERE when running command"
+        )
+
+    if "repo_id" not in cfg:
+        raise Exception(
+            "repo_id is required, add +repo_id=REPO_ID_HERE when running command"
+        )
+
+    login(cfg.hf_token)
 
     TokenizerClass = tokenizer_registry[cfg.tokenizer.name]
     tokenizer = TokenizerClass(cfg.tokenizer.file)
