@@ -325,7 +325,10 @@ class MorphlingTokenizer(PreTrainedTokenizer):
 
     def _reconstruct_infix(self, stem: str, infix_token: str) -> str:
         infix = infix_token[:2]
-        new_stem = stem[0] + infix + stem[1:]
+        if stem[0] in self.VOWEL_CHARS:
+            new_stem = infix + stem
+        else:
+            new_stem = stem[0] + infix + stem[1:]
         return new_stem
 
     def _get_suffix(self, suffix_token: str) -> str:
