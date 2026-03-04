@@ -1,7 +1,7 @@
 import os
 
 import hydra
-from datasets import load_dataset
+from datasets import load_dataset, DatasetDict
 from huggingface_hub import login
 from omegaconf import DictConfig, OmegaConf
 
@@ -14,14 +14,14 @@ tokenizer_registry = {
 }
 
 
-def tokenize_dataset(dataset, tokenizer):
+def tokenize_dataset(dataset, tokenizer, num_proc):
     def tokenize_function(examples):
         return tokenizer(examples["text"])
 
     dataset = dataset.map(
         tokenize_function,
         remove_columns=dataset.column_names,
-        num_proc=os.cpu_count(),
+        num_proc=num_proc,
     )
 
     return dataset
@@ -60,11 +60,16 @@ def main(cfg: DictConfig):
 
     print(f"Tokenizing dataset {cfg.dataset.path} with {cfg.tokenizer.name}")
 
-    dataset = tokenize_dataset(dataset, tokenizer)
+    num_proc = os.cpu_count()
+    if "num_proc" in cfg:
+        num_proc = cfg.num_proc
+
+    dataset = tokenize_dataset(dataset, tokenizer, num_proc=num_proc)
     print("Done tokenizing dataset.")
 
     print(f"Pushing to {cfg.repo_id}...")
-    dataset.push_to_hub(cfg.repo_id, private=True)
+    dataset = DatasetDict({"train": dataset})
+    dataset.push_to_hub(cfg.repo_id)
 
     print(f"Pushed tokenized dataset to {cfg.repo_id}.")
 
