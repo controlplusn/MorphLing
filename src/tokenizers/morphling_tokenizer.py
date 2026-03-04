@@ -41,6 +41,12 @@ class MorphlingTokenizer(PreTrainedTokenizer):
 
         self._load_wordlist()
 
+        # keep newlines and split on space
+        # keep punctuations
+        # handle words like araw-araw, 'Yon, and di'ba
+        self.WORD_SPLIT_PATTERN = r"[\w']+(?:-\w+)*|[^\w\s]|\n"
+        self.word_split_regex = re.compile(self.WORD_SPLIT_PATTERN, re.UNICODE)
+
         # train on corpus_file if tokenizer_file doesn't exist yet
         if not os.path.exists(bpe_tokenizer_file):
             if dataset is None:
@@ -289,9 +295,8 @@ class MorphlingTokenizer(PreTrainedTokenizer):
         tokens = bpe_tokens + special_tokens
         return tokens
 
-    def _split_to_words(self, s: str) -> list:
-        # words = word_tokenize(s)
-        words = re.findall(r"[\w']+(?:-\w+)*|[^\w\s]|\n", s, re.UNICODE)
+    def _split_to_words(self, text: str) -> list:
+        words = self.word_split_regex.findall(text)
         return words
 
     def _reconstruct_full_reduplication(self, stem: str) -> str:
