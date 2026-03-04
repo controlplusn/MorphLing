@@ -48,6 +48,7 @@ class MorphlingTokenizer(PreTrainedTokenizer):
         # handle words like araw-araw, 'Yon, and di'ba
         self.WORD_SPLIT_PATTERN = r"[\w']+(?:-\w+)*|[^\w\s]|\n"
         self.word_split_regex = re.compile(self.WORD_SPLIT_PATTERN, re.UNICODE)
+        self.normalizer = Sequence([NFKC(), StripAccents()])
 
         # train on corpus_file if tokenizer_file doesn't exist yet
         if not os.path.exists(bpe_tokenizer_file):
@@ -72,8 +73,6 @@ class MorphlingTokenizer(PreTrainedTokenizer):
             add_bos_token=False,
             add_eos_token=False,
         )
-
-        self.normalizer = Sequence([NFKC(), StripAccents()])
 
         # for O(1) identification if token is special
         self.SPECIAL_TOKEN_MARKER = "\u241f"
