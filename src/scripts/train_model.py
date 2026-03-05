@@ -113,7 +113,7 @@ def main(cfg: DictConfig):
         save_steps=cfg.training.save_steps,
         push_to_hub=True,
         hub_token=cfg.hf_token,
-        hub_private_repo=True,
+        # hub_private_repo=True,
         hub_strategy="all_checkpoints",
     )
 
