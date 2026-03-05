@@ -120,27 +120,6 @@ def main(cfg: DictConfig):
     print("=== Training Configuration ===")
     print(OmegaConf.to_yaml(cfg.training))
 
-    def group_texts(examples):
-        block_size = cfg.model.context_window
-
-        concatenated_examples = {k: sum(examples[k], []) for k in examples.keys()}
-        total_length = len(concatenated_examples[list(examples.keys())[0]])
-
-        result = {
-            k: [t[i : i + block_size] for i in range(0, total_length, block_size)]
-            for k, t in concatenated_examples.items()
-        }
-
-        return result
-
-    dataset = dataset.map(
-        group_texts,
-        batched=True,
-        batch_size=1000,
-        num_proc=os.cpu_count(),
-        remove_columns=dataset.column_names,
-    )
-
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
 
     trainer = Trainer(
