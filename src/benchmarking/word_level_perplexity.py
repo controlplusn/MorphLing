@@ -1,0 +1,134 @@
+import torch
+import math
+
+import hydra
+import torchinfo
+from huggingface_hub import login, HfApi
+from omegaconf import DictConfig, OmegaConf
+from transformers.models.llama import LlamaForCausalLM
+from datasets import load_dataset
+from tqdm import tqdm
+
+from ..tokenizers import MorphlingTokenizer, SentencePieceTokenizer
+
+tokenizer_registry = {
+    "MorphlingTokenizer": MorphlingTokenizer,
+    "SentencePieceTokenizer": SentencePieceTokenizer,
+}
+
+
+def calculate_dataset_word_level_perplexity(
+    dataset, model, tokenizer, text_column="text", device="cuda"
+):
+    """
+    Computes word-level perplexity across an entire Hugging Face dataset.
+    """
+    model.eval()
+    model.to(device)
+
+    total_dataset_nll = 0.0
+    total_dataset_words = 0
+    total_dataset_tokens = 0
+    valid_sequences = 0
+
+    for item in tqdm(dataset, desc="Evaluating Dataset"):
+        text = item[text_column]
+
+        if not text or not text.strip():
+            continue
+
+        words = text.split()
+        num_words = len(words)
+
+        inputs = tokenizer(text, return_tensors="pt")
+        input_ids = inputs["input_ids"].to(device)
+        num_tokens = input_ids.size(1)
+
+        if num_tokens < 2:
+            continue
+
+        with torch.no_grad():
+            outputs = model(input_ids, labels=input_ids)
+
+            avg_nll_per_prediction = outputs.loss.item()
+            sequence_total_nll = avg_nll_per_prediction * (num_tokens - 1)
+
+        total_dataset_nll += sequence_total_nll
+        total_dataset_words += num_words
+        total_dataset_tokens += num_tokens
+        valid_sequences += 1
+
+    if total_dataset_words == 0:
+        print("Error: No words found in the dataset.")
+        return float("inf")
+
+    dataset_word_normalized_nll = total_dataset_nll / total_dataset_words
+    dataset_word_level_ppl = math.exp(dataset_word_normalized_nll)
+
+    dataset_token_normalized_nll = total_dataset_nll / (
+        total_dataset_tokens - valid_sequences
+    )
+    dataset_token_level_ppl = math.exp(dataset_token_normalized_nll)
+
+    print("\n=== Dataset Evaluation Results ===")
+    print(f"Total Sequences Evaluated: {valid_sequences}")
+    print(f"Total Words: {total_dataset_words}")
+    print(f"Total Tokens: {total_dataset_tokens}")
+    print(f"Dataset Token-Level Perplexity: {dataset_token_level_ppl:.2f}")
+    print(f"Dataset Word-Level Perplexity: {dataset_word_level_ppl:.2f}")
+
+    return dataset_word_level_ppl
+
+
+@hydra.main(version_base="1.3", config_path="../conf", config_name="config")
+def main(cfg: DictConfig):
+    print("=== Active Configuration ===")
+    print(OmegaConf.to_yaml(cfg))
+
+    if "hf_token" not in cfg:
+        raise Exception(
+            "hf_token is required, add +hf_token=YOUR_TOKEN_HERE when running command"
+        )
+
+    login(cfg.hf_token)
+
+    api = HfApi()
+    user = api.whoami()
+    username = user["name"]
+
+    print(f"\n> Logged in as {username}")
+
+    TokenizerClass = tokenizer_registry[cfg.tokenizer.name]
+    tokenizer = TokenizerClass(cfg.tokenizer.file)
+    print(f"\n> Loading {cfg.tokenizer.name} with {cfg.tokenizer.file}")
+
+    model_id = f"{username}/{cfg.training.output_dir}"
+    print(f"\n> Loading {model_id}")
+    model = LlamaForCausalLM.from_pretrained(model_id)
+
+    print()
+    torchinfo.summary(model)
+
+    print(f"\n> Loading dataset: {cfg.dataset.path}...")
+    dataset = load_dataset(
+        path=cfg.dataset.path,
+        name=cfg.dataset.name,
+        split=cfg.dataset.split,
+    )
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"\n> Moving model to {device} and starting evaluation...")
+
+    text_column_name = "text"
+
+    calculate_dataset_word_level_perplexity(
+        dataset=dataset,
+        model=model,
+        tokenizer=tokenizer,
+        text_column=text_column_name,
+        device=device,
+    )
+
+
+if __name__ == "__main__":
+    main()
