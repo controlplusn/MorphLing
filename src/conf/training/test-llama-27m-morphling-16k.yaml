@@ -1,0 +1,8 @@
+output_dir: "test-llama-27m-morphling-16k"
+train_batch_size: 64
+gradient_accumulation_steps: 8
+max_steps: 6000
+learning_rate: 1.5e-3
+warmup_steps: 300
+logging_steps: 10
+save_steps: 200

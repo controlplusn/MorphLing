@@ -1,0 +1,2 @@
+hidden_size: 512
+context_window: 512
