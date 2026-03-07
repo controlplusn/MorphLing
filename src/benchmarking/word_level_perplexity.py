@@ -20,9 +20,6 @@ tokenizer_registry = {
 def calculate_dataset_word_level_perplexity(
     dataset, model, tokenizer, text_column="text", device="cuda"
 ):
-    """
-    Computes word-level perplexity across an entire Hugging Face dataset.
-    """
     model.eval()
     model.to(device)
 
@@ -30,6 +27,9 @@ def calculate_dataset_word_level_perplexity(
     total_dataset_words = 0
     total_dataset_tokens = 0
     valid_sequences = 0
+
+    max_length = getattr(model.config, "max_position_embeddings", 2048)
+    stride = 512
 
     for item in tqdm(dataset, desc="Evaluating Dataset"):
         text = item[text_column]
@@ -40,22 +40,31 @@ def calculate_dataset_word_level_perplexity(
         words = text.split()
         num_words = len(words)
 
-        inputs = tokenizer(text, return_tensors="pt")
+        inputs = tokenizer(text, return_tensors="pt", truncation=False)
         input_ids = inputs["input_ids"].to(device)
-        num_tokens = input_ids.size(1)
+        seq_len = input_ids.size(1)
 
-        if num_tokens < 2:
+        if seq_len < 2:
             continue
 
-        with torch.no_grad():
-            outputs = model(input_ids, labels=input_ids)
+        sequence_total_nll = 0.0
 
-            avg_nll_per_prediction = outputs.loss.item()
-            sequence_total_nll = avg_nll_per_prediction * (num_tokens - 1)
+        for i in range(0, seq_len, stride):
+            begin_loc = max(i + stride - max_length, 0)
+            end_loc = min(i + stride, seq_len)
+            trg_len = end_loc - i
+
+            input_chunk = input_ids[:, begin_loc:end_loc]
+            target_ids = input_chunk.clone()
+            target_ids[:, :-trg_len] = -100
+
+            with torch.no_grad():
+                outputs = model(input_chunk, labels=target_ids)
+                sequence_total_nll += outputs.loss.item() * trg_len
 
         total_dataset_nll += sequence_total_nll
         total_dataset_words += num_words
-        total_dataset_tokens += num_tokens
+        total_dataset_tokens += seq_len
         valid_sequences += 1
 
     if total_dataset_words == 0:
