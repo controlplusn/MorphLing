@@ -36,12 +36,20 @@ def calculate_dataset_word_level_perplexity(
         if not text or not text.strip():
             continue
 
+        words = text.split()
+        num_words = len(words)
+
+        if num_words == 0:
+            continue
+
         inputs = tokenizer(text, return_tensors="pt")
         input_ids_full = inputs["input_ids"].to(device)
         total_tokens = input_ids_full.size(1)
 
         if total_tokens < 2:
             continue
+
+        total_dataset_words += num_words
 
         for i in range(0, total_tokens, max_length):
             input_ids = input_ids_full[:, i : i + max_length]
@@ -50,23 +58,12 @@ def calculate_dataset_word_level_perplexity(
             if num_tokens < 2:
                 continue
 
-            decoded_chunk = tokenizer.decode(
-                input_ids[0].cpu().tolist(), skip_special_tokens=True
-            )
-            words = decoded_chunk.split()
-            num_words = len(words)
-
-            if num_words == 0:
-                continue
-
             with torch.no_grad():
                 outputs = model(input_ids, labels=input_ids)
-
                 avg_nll_per_prediction = outputs.loss.item()
                 chunk_total_nll = avg_nll_per_prediction * (num_tokens - 1)
 
             total_dataset_nll += chunk_total_nll
-            total_dataset_words += num_words
             total_dataset_tokens += num_tokens
             valid_chunks += 1
 
