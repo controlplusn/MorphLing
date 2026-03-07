@@ -23,13 +23,12 @@ def calculate_dataset_word_level_perplexity(
     model.eval()
     model.to(device)
 
+    max_length = getattr(model.config, "max_position_embeddings", 2048)
+
     total_dataset_nll = 0.0
     total_dataset_words = 0
     total_dataset_tokens = 0
-    valid_sequences = 0
-
-    max_length = getattr(model.config, "max_position_embeddings", 2048)
-    stride = 512
+    valid_chunks = 0
 
     for item in tqdm(dataset, desc="Evaluating Dataset"):
         text = item[text_column]
@@ -37,35 +36,39 @@ def calculate_dataset_word_level_perplexity(
         if not text or not text.strip():
             continue
 
-        words = text.split()
-        num_words = len(words)
+        inputs = tokenizer(text, return_tensors="pt")
+        input_ids_full = inputs["input_ids"].to(device)
+        total_tokens = input_ids_full.size(1)
 
-        inputs = tokenizer(text, return_tensors="pt", truncation=False)
-        input_ids = inputs["input_ids"].to(device)
-        seq_len = input_ids.size(1)
-
-        if seq_len < 2:
+        if total_tokens < 2:
             continue
 
-        sequence_total_nll = 0.0
+        for i in range(0, total_tokens, max_length):
+            input_ids = input_ids_full[:, i : i + max_length]
+            num_tokens = input_ids.size(1)
 
-        for i in range(0, seq_len, stride):
-            begin_loc = max(i + stride - max_length, 0)
-            end_loc = min(i + stride, seq_len)
-            trg_len = end_loc - i
+            if num_tokens < 2:
+                continue
 
-            input_chunk = input_ids[:, begin_loc:end_loc]
-            target_ids = input_chunk.clone()
-            target_ids[:, :-trg_len] = -100
+            decoded_chunk = tokenizer.decode(
+                input_ids[0].cpu().tolist(), skip_special_tokens=True
+            )
+            words = decoded_chunk.split()
+            num_words = len(words)
+
+            if num_words == 0:
+                continue
 
             with torch.no_grad():
-                outputs = model(input_chunk, labels=target_ids)
-                sequence_total_nll += outputs.loss.item() * trg_len
+                outputs = model(input_ids, labels=input_ids)
 
-        total_dataset_nll += sequence_total_nll
-        total_dataset_words += num_words
-        total_dataset_tokens += seq_len
-        valid_sequences += 1
+                avg_nll_per_prediction = outputs.loss.item()
+                chunk_total_nll = avg_nll_per_prediction * (num_tokens - 1)
+
+            total_dataset_nll += chunk_total_nll
+            total_dataset_words += num_words
+            total_dataset_tokens += num_tokens
+            valid_chunks += 1
 
     if total_dataset_words == 0:
         print("Error: No words found in the dataset.")
@@ -75,14 +78,14 @@ def calculate_dataset_word_level_perplexity(
     dataset_word_level_ppl = math.exp(dataset_word_normalized_nll)
 
     dataset_token_normalized_nll = total_dataset_nll / (
-        total_dataset_tokens - valid_sequences
+        total_dataset_tokens - valid_chunks
     )
     dataset_token_level_ppl = math.exp(dataset_token_normalized_nll)
 
     token_fertility_rate = total_dataset_tokens / total_dataset_words
 
     print("\n=== Dataset Evaluation Results ===")
-    print(f"Total Sequences Evaluated: {valid_sequences}")
+    print(f"Total Chunks Evaluated: {valid_chunks}")
     print(f"Total Words: {total_dataset_words}")
     print(f"Total Tokens: {total_dataset_tokens}")
     print(f"Token Fertility Rate: {token_fertility_rate:.2f}")
