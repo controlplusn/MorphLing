@@ -70,10 +70,13 @@ def calculate_dataset_word_level_perplexity(
     )
     dataset_token_level_ppl = math.exp(dataset_token_normalized_nll)
 
+    token_fertility_rate = total_dataset_tokens / total_dataset_words
+
     print("\n=== Dataset Evaluation Results ===")
     print(f"Total Sequences Evaluated: {valid_sequences}")
     print(f"Total Words: {total_dataset_words}")
     print(f"Total Tokens: {total_dataset_tokens}")
+    print(f"Token Fertility Rate: {token_fertility_rate:.2f}")
     print(f"Dataset Token-Level Perplexity: {dataset_token_level_ppl:.2f}")
     print(f"Dataset Word-Level Perplexity: {dataset_word_level_ppl:.2f}")
 
