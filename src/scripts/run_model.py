@@ -33,10 +33,18 @@ def main(cfg: DictConfig):
     model_id = f"{username}/{cfg.training.output_dir}"
 
     print(f"> Logged in as {username}")
-    print(f"> Loading {model_id}...")
+
+    load_kwargs = {}
+    if "checkpoint" in cfg:
+        checkpoint_folder = f"checkpoint-{cfg.checkpoint}"
+        load_kwargs["subfolder"] = checkpoint_folder
+        print(f"> Loading {model_id} (subfolder: {checkpoint_folder})...")
+    else:
+        print(f"> Loading {model_id}...")
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = AutoModelForCausalLM.from_pretrained(model_id).to(device)
+
+    model = AutoModelForCausalLM.from_pretrained(model_id, **load_kwargs).to(device)
     model.config.pad_token_id = model.config.eos_token_id
     model.generation_config.pad_token_id = model.config.eos_token_id
 
