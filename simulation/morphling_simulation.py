@@ -745,12 +745,13 @@ class MorphTagging(Scene):
         final_label = Text("Final token sequence:", font="Consolas",
                            font_size=15, color=MUTED)
         final_label.next_to(tag_label, DOWN, buff=0.55).to_edge(LEFT, buff=0.5)
- 
+
+        # NOTE: Fixed ordering of tokenization output   
         # Tokens in order: ##INFIX, ##REDUP, [tawag], ##SUFFIX
-        f1 = token_chip("##INFIX",  ORANGE, PANEL)
+        f1 = token_chip("[_tawag]",  SUCCESS, "#0A2010")
         f2 = token_chip("##REDUP",  PURPLE, PANEL)
-        f3 = token_chip("[tawag]",  SUCCESS, "#0A2010")
-        f4 = token_chip("##SUFFIX", YELLOW, PANEL)
+        f3 = token_chip("in##INFIX",  ORANGE, PANEL)
+        f4 = token_chip("an##SUFFIX", YELLOW, PANEL)
  
         final_seq = VGroup(f1, f2, f3, f4)
         final_seq.arrange(RIGHT, buff=0.22)
@@ -802,6 +803,179 @@ class MorphTagging(Scene):
         self.wait(0.8)
 
 
+# SECTION: Sequence Assembly
+class SequenceAssembly(Scene):
+    def construct(self):
+        self.camera.background_color = BG
+ 
+        bar = pipeline_bar(active=3, done={0, 1, 2})
+        div = Line(LEFT * 6.8, RIGHT * 6.8, stroke_color=BORDER, stroke_width=1
+                   ).next_to(bar, DOWN, buff=0.18)
+        self.add(bar, div)
+ 
+        # ── Header ────────────────────────────────────────────────────────────
+        heading = Text("Phase 4: Sequence Assembly", font="Consolas",
+                       font_size=24, color=ORANGE)
+        heading.next_to(div, DOWN, buff=0.25).to_edge(LEFT, buff=0.5)
+ 
+        purpose = Text(
+            "Goal: hook all pieces together in the exact order, with invisible glue",
+            font="Consolas", font_size=14, color=MUTED
+        )
+        purpose.next_to(heading, DOWN, buff=0.10).to_edge(LEFT, buff=0.5)
+ 
+        self.play(FadeIn(heading), FadeIn(purpose), run_time=0.5)
+        self.wait(0.3)
+ 
+        # ── Helper: token chip (reused style) ─────────────────────────────────
+        def token_chip(text, col, bg_col=PANEL, extra_w=0.0):
+            w = len(text) * 0.165 + 0.5 + extra_w
+            box = RoundedRectangle(
+                corner_radius=0.1, width=w, height=0.44,
+                fill_color=bg_col, fill_opacity=1,
+                stroke_color=col, stroke_width=1.8
+            )
+            lbl = Text(text, font="Consolas", font_size=16, color=col)
+            lbl.move_to(box)
+            return VGroup(box, lbl)
+ 
+        def glue_dot():
+            d = Dot(radius=0.07, color=MUTED)
+            return d
+ 
+        # ── Example word ──────────────────────────────────────────────────────
+        ex_lbl = Text('Input word:  "Tinatawagan"  (capitalized)',
+                      font="Consolas", font_size=16, color=YELLOW)
+        ex_lbl.next_to(purpose, DOWN, buff=0.30).to_edge(LEFT, buff=0.5)
+        self.play(FadeIn(ex_lbl))
+        self.wait(0.3)
+ 
+        # ── Step 1 – Capitalisation tracking ──────────────────────────────────
+        step1_lbl = Text("Step 1 — Capital 'T' detected → lowercase + ##CAPITAL tag",
+                         font="Consolas", font_size=13, color=MUTED)
+        step1_lbl.next_to(ex_lbl, DOWN, buff=0.28).to_edge(LEFT, buff=0.5)
+        self.play(FadeIn(step1_lbl))
+ 
+        cap_chip = token_chip("##CAPITAL", ACCENT, "#0C2A4A")
+        lower_chip = token_chip('"tinatawagan"', WHITE, PANEL)
+ 
+        cap_row = VGroup(cap_chip, lower_chip)
+        cap_row.arrange(RIGHT, buff=0.35)
+        cap_row.next_to(step1_lbl, DOWN, buff=0.18).to_edge(LEFT, buff=0.5)
+ 
+        arrow_cap = Arrow(
+            cap_chip.get_right(), lower_chip.get_left(),
+            buff=0.08, stroke_width=2, color=BORDER,
+            max_tip_length_to_length_ratio=0.3
+        )
+        cap_note = Text("sticky note: first letter was uppercase",
+                        font="Consolas", font_size=12, color=ACCENT)
+        cap_note.next_to(cap_chip, DOWN, buff=0.08).align_to(cap_chip, LEFT)
+ 
+        self.play(FadeIn(cap_chip, shift=UP * 0.1), run_time=0.4)
+        self.play(FadeIn(cap_note), run_time=0.3)
+        self.play(GrowArrow(arrow_cap), FadeIn(lower_chip), run_time=0.5)
+        self.wait(0.5)
+ 
+        # ── Step 2 – Pieces from morph tagging ────────────────────────────────
+        step2_lbl = Text("Step 2 — Pieces from Phase 3 (morph tags + BPE root)",
+                         font="Consolas", font_size=13, color=MUTED)
+        step2_lbl.next_to(cap_row, DOWN, buff=0.30).to_edge(LEFT, buff=0.5)
+        self.play(FadeIn(step2_lbl))
+ 
+        p_root   = token_chip("[_tawag]",  SUCCESS, "#0A2010")
+        p_redup  = token_chip("##REDUP",  PURPLE, PANEL)
+        p_infix  = token_chip("in##INFIX",  ORANGE, PANEL)
+        p_suffix = token_chip("an##SUFFIX", YELLOW, PANEL)
+        p_cap = token_chip("##CAPITAL", ACCENT, "#0C2A4A")
+ 
+        pieces = VGroup(p_root, p_redup, p_infix, p_suffix, p_cap)
+        pieces.arrange(RIGHT, buff=0.22)
+        pieces.next_to(step2_lbl, DOWN, buff=0.16).to_edge(LEFT, buff=0.5)
+ 
+        for p in pieces:
+            self.play(FadeIn(p, scale=0.9), run_time=0.3)
+        self.wait(0.4)
+ 
+        # ── Step 3 – Invisible glue binding ───────────────────────────────────
+        step3_lbl = Text(
+            "Step 3 — Bind with invisible non-printable Unicode 🔗  (O(1) lookup)",
+            font="Consolas", font_size=13, color=MUTED
+        )
+        step3_lbl.next_to(pieces, DOWN, buff=0.32).to_edge(LEFT, buff=0.5)
+        self.play(FadeIn(step3_lbl))
+        self.wait(0.2)
+ 
+        # Show glue dots appearing between each chip in the final sequence
+        glue_note = Text(
+            "🔗 = hidden barcode — computer knows it's a grammar tag, not plain text",
+            font="Consolas", font_size=12, color=MUTED
+        )
+        glue_note.next_to(step3_lbl, DOWN, buff=0.08).to_edge(LEFT, buff=0.7)
+        self.play(FadeIn(glue_note), run_time=0.4)
+        self.wait(0.4)
+ 
+        # ── Final assembled sequence ───────────────────────────────────────────
+        final_lbl = Text("Final assembled sequence:", font="Consolas",
+                         font_size=14, color=MUTED)
+        final_lbl.next_to(glue_note, DOWN, buff=0.32).to_edge(LEFT, buff=0.5)
+        self.play(FadeIn(final_lbl))
+ 
+        # Build final chips: ##CAPITAL  🔗  ##INFIX  🔗  [tawag]  🔗  ##SUFFIX
+        f_cap = token_chip("##CAPITAL", ACCENT,   "#0C2A4A")
+        f_redup = token_chip("##REDUP", PURPLE, PANEL)
+        f_infix = token_chip("in##INFIX",   ORANGE,   PANEL)
+        f_root = token_chip("[_tawag]",   SUCCESS,  "#0A2010")
+        f_suffix = token_chip("an##SUFFIX",  YELLOW,   PANEL)
+ 
+        final_tokens = [f_cap, f_redup, f_infix, f_root, f_suffix]
+ 
+        # Interleave with glue dots
+        seq_group = VGroup()
+        for i, ft in enumerate(final_tokens):
+            seq_group.add(ft)
+            if i < len(final_tokens) - 1:
+                g = glue_dot()
+                seq_group.add(g)
+ 
+        seq_group.arrange(RIGHT, buff=0.14)
+        seq_group.next_to(final_lbl, RIGHT, buff=0.3)
+ 
+        # Animate chips + dots appearing in order
+        for mob in seq_group:
+            if isinstance(mob, Dot):
+                self.play(FadeIn(mob), run_time=0.2)
+            else:
+                self.play(FadeIn(mob, scale=0.9), run_time=0.4)
+        self.wait(0.5)
+ 
+        # ── Takeaway ──────────────────────────────────────────────────────────
+        takeaway = Text(
+            "Order preserved · Capital restored · Tags unambiguous → LLM-ready",
+            font="Consolas", font_size=14, color=SUCCESS
+        )
+        takeaway.next_to(seq_group, DOWN, buff=0.32).to_edge(LEFT, buff=0.5)
+        self.play(FadeIn(takeaway, shift=UP * 0.1))
+        self.wait(1.2)
+ 
+        # ── Cleanup + advance bar ─────────────────────────────────────────────
+        content = VGroup(
+            heading, purpose, ex_lbl,
+            step1_lbl, cap_chip, arrow_cap, lower_chip, cap_note,
+            step2_lbl, pieces,
+            step3_lbl, glue_note,
+            final_lbl, seq_group,
+            takeaway,
+        )
+        self.play(FadeOut(content))
+ 
+        bar_done = pipeline_bar(active=4, done={0, 1, 2, 3})
+        div_done = Line(LEFT * 6.8, RIGHT * 6.8, stroke_color=BORDER, stroke_width=1
+                        ).next_to(bar_done, DOWN, buff=0.18)
+        self.play(Transform(bar, bar_done), Transform(div, div_done), run_time=0.5)
+        self.wait(0.8)
+
+
 
 # ── Combined render target ────────────────────────────────────────────────────
 class FullPipeline(Scene):
@@ -809,6 +983,7 @@ class FullPipeline(Scene):
         PipelineOverview.construct(self)
         Normalization.construct(self)
         Caching.construct(self)
+        MorphTagging.construct(self)
 
 class CachingOnly(Scene):
     def construct(self):
@@ -825,3 +1000,11 @@ class MorphTaggingOnly(Scene):
                    ).next_to(bar, DOWN, buff=0.18)
         self.add(bar, div)
         MorphTagging.construct(self)
+
+class SeqAssemblyOnly(Scene):
+    def construct(self):
+        bar = pipeline_bar(active=2, done={0, 1})
+        div = Line(LEFT*6.8, RIGHT*6.8, stroke_color=BORDER, stroke_width=1
+                   ).next_to(bar, DOWN, buff=0.18)
+        self.add(bar, div)
+        SequenceAssembly.construct(self)
