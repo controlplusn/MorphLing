@@ -584,8 +584,8 @@ class MorphTagging(Scene):
             return VGroup(box, lbl)
  
         s1 = badge("Step 1: Strip word -> find root", ACCENT)
-        s2 = badge("Step 2: BPE-encode root", PURPLE)
-        s3 = badge("Step 3: Affixes -> special tokens", ORANGE)
+        s2 = badge("Step 2: Isolate root", PURPLE)
+        s3 = badge("Step 3: Morph Tags", ORANGE)
  
         s1.next_to(purpose, DOWN, buff=0.28).to_edge(LEFT, buff=0.5)
         a12 = Arrow(s1.get_right(), s1.get_right() + RIGHT*0.4,
@@ -669,7 +669,7 @@ class MorphTagging(Scene):
         self.play(s2[0].animate.set_stroke(color=WHITE, width=3), run_time=0.5)
         self.wait(0.2)
  
-        bpe_label = Text("BPE encodes root:", font="Consolas", font_size=15, color=MUTED)
+        bpe_label = Text("Isolate root:", font="Consolas", font_size=15, color=MUTED)
         bpe_label.next_to(strip_label, DOWN, buff=0.65).to_edge(LEFT, buff=0.5)
  
         # Arrow from root chip down to BPE result
@@ -698,14 +698,14 @@ class MorphTagging(Scene):
         self.play(s3[0].animate.set_stroke(color=WHITE, width=3), run_time=0.5)
         self.wait(0.2)
  
-        tag_label = Text("Affixes -> tokens:", font="Consolas", font_size=15, color=MUTED)
+        tag_label = Text("Morph Tags", font="Consolas", font_size=15, color=MUTED)
         tag_label.next_to(bpe_label, DOWN, buff=0.55).to_edge(LEFT, buff=0.5)
  
         # Map chips to their special tokens
         tag_map = [
-            (chip_in,    "##INFIX",  ORANGE),
-            (chip_redup, "##REDUP",  PURPLE),
-            (chip_suf,   "##SUFFIX", YELLOW),
+            (chip_in, "infix",  ORANGE),
+            (chip_redup, "partial reduplication",  PURPLE),
+            (chip_suf, "suffix", YELLOW),
         ]
  
         tag_chips = VGroup()
@@ -741,45 +741,12 @@ class MorphTagging(Scene):
         self.play(s3[0].animate.set_stroke(color=ORANGE, width=2), run_time=0.5)
         self.wait(0.8)
  
-        # ── Final assembled token sequence ────────────────────────────────────
-        final_label = Text("Final token sequence:", font="Consolas",
-                           font_size=15, color=MUTED)
-        final_label.next_to(tag_label, DOWN, buff=0.55).to_edge(LEFT, buff=0.5)
-
-        # NOTE: Fixed ordering of tokenization output   
-        # Tokens in order: ##INFIX, ##REDUP, [tawag], ##SUFFIX
-        f1 = token_chip("[_tawag]",  SUCCESS, "#0A2010")
-        f2 = token_chip("##REDUP",  PURPLE, PANEL)
-        f3 = token_chip("in##INFIX",  ORANGE, PANEL)
-        f4 = token_chip("an##SUFFIX", YELLOW, PANEL)
- 
-        final_seq = VGroup(f1, f2, f3, f4)
-        final_seq.arrange(RIGHT, buff=0.22)
-        final_seq.next_to(final_label, RIGHT, buff=0.3)
- 
-        # Small connector arrows between final tokens
-        conn_arrows = VGroup()
-        for i in range(len(final_seq) - 1):
-            ca = Arrow(
-                final_seq[i].get_right(), final_seq[i+1].get_left(),
-                buff=0.06, stroke_width=1.5, color=BORDER,
-                max_tip_length_to_length_ratio=0.4
-            )
-            conn_arrows.add(ca)
- 
-        self.play(FadeIn(final_label), run_time=0.8)
-        self.wait(0.3)  
-        for ft in final_seq:
-            self.play(FadeIn(ft, scale=0.9), run_time=0.5)
-        self.play(*[GrowArrow(ca) for ca in conn_arrows], run_time=0.6)
-        self.wait(0.8)
- 
         # Takeaway
         takeaway = Text(
             "Grammar is preserved as tokens — the LLM sees structure, not just characters",
             font="Consolas", font_size=14, color=SUCCESS
         )
-        takeaway.next_to(final_label, DOWN, buff=0.38).to_edge(LEFT, buff=0.5)
+        takeaway.next_to(tag_label, DOWN, buff=0.38).to_edge(LEFT, buff=0.5)
         self.play(FadeIn(takeaway, shift=UP*0.1))
         self.wait(1.5)
  
@@ -791,7 +758,6 @@ class MorphTagging(Scene):
             strip_label, decomp_row, chip_labels,
             bpe_arrow, bpe_label, bpe_result, bpe_note,
             tag_label, tag_chips, tag_arrows,
-            final_label, final_seq, conn_arrows,
             takeaway,
         )
         self.play(FadeOut(content))
@@ -819,7 +785,7 @@ class SequenceAssembly(Scene):
         heading.next_to(div, DOWN, buff=0.25).to_edge(LEFT, buff=0.5)
  
         purpose = Text(
-            "Goal: hook all pieces together in the exact order, with invisible glue",
+            "Goal: hook all pieces together in the exact order",
             font="Consolas", font_size=14, color=MUTED
         )
         purpose.next_to(heading, DOWN, buff=0.10).to_edge(LEFT, buff=0.5)
@@ -868,7 +834,7 @@ class SequenceAssembly(Scene):
             buff=0.08, stroke_width=2, color=BORDER,
             max_tip_length_to_length_ratio=0.3
         )
-        cap_note = Text("sticky note: first letter was uppercase",
+        cap_note = Text("note: first letter was uppercase",
                         font="Consolas", font_size=12, color=ACCENT)
         cap_note.next_to(cap_chip, DOWN, buff=0.08).align_to(cap_chip, LEFT)
  
@@ -877,48 +843,10 @@ class SequenceAssembly(Scene):
         self.play(GrowArrow(arrow_cap), FadeIn(lower_chip), run_time=0.5)
         self.wait(0.5)
  
-        # ── Step 2 – Pieces from morph tagging ────────────────────────────────
-        step2_lbl = Text("Step 2 — Pieces from Phase 3 (morph tags + BPE root)",
-                         font="Consolas", font_size=13, color=MUTED)
-        step2_lbl.next_to(cap_row, DOWN, buff=0.30).to_edge(LEFT, buff=0.5)
-        self.play(FadeIn(step2_lbl))
- 
-        p_root   = token_chip("[_tawag]",  SUCCESS, "#0A2010")
-        p_redup  = token_chip("##REDUP",  PURPLE, PANEL)
-        p_infix  = token_chip("in##INFIX",  ORANGE, PANEL)
-        p_suffix = token_chip("an##SUFFIX", YELLOW, PANEL)
-        p_cap = token_chip("##CAPITAL", ACCENT, "#0C2A4A")
- 
-        pieces = VGroup(p_root, p_redup, p_infix, p_suffix, p_cap)
-        pieces.arrange(RIGHT, buff=0.22)
-        pieces.next_to(step2_lbl, DOWN, buff=0.16).to_edge(LEFT, buff=0.5)
- 
-        for p in pieces:
-            self.play(FadeIn(p, scale=0.9), run_time=0.3)
-        self.wait(0.4)
- 
-        # ── Step 3 – Invisible glue binding ───────────────────────────────────
-        step3_lbl = Text(
-            "Step 3 — Bind with invisible non-printable Unicode 🔗  (O(1) lookup)",
-            font="Consolas", font_size=13, color=MUTED
-        )
-        step3_lbl.next_to(pieces, DOWN, buff=0.32).to_edge(LEFT, buff=0.5)
-        self.play(FadeIn(step3_lbl))
-        self.wait(0.2)
- 
-        # Show glue dots appearing between each chip in the final sequence
-        glue_note = Text(
-            "🔗 = hidden barcode — computer knows it's a grammar tag, not plain text",
-            font="Consolas", font_size=12, color=MUTED
-        )
-        glue_note.next_to(step3_lbl, DOWN, buff=0.08).to_edge(LEFT, buff=0.7)
-        self.play(FadeIn(glue_note), run_time=0.4)
-        self.wait(0.4)
- 
         # ── Final assembled sequence ───────────────────────────────────────────
         final_lbl = Text("Final assembled sequence:", font="Consolas",
                          font_size=14, color=MUTED)
-        final_lbl.next_to(glue_note, DOWN, buff=0.32).to_edge(LEFT, buff=0.5)
+        final_lbl.next_to(cap_note, DOWN, buff=0.45).to_edge(LEFT, buff=0.5) 
         self.play(FadeIn(final_lbl))
  
         # Build final chips: ##CAPITAL  🔗  ##INFIX  🔗  [tawag]  🔗  ##SUFFIX
@@ -928,26 +856,24 @@ class SequenceAssembly(Scene):
         f_root = token_chip("[_tawag]",   SUCCESS,  "#0A2010")
         f_suffix = token_chip("an##SUFFIX",  YELLOW,   PANEL)
  
-        final_tokens = [f_cap, f_redup, f_infix, f_root, f_suffix]
+        final_tokens = [f_root, f_redup, f_infix, f_suffix, f_cap]
  
         # Interleave with glue dots
         seq_group = VGroup()
         for i, ft in enumerate(final_tokens):
             seq_group.add(ft)
             if i < len(final_tokens) - 1:
-                g = glue_dot()
-                seq_group.add(g)
+                seq_group.add(glue_dot())
  
         seq_group.arrange(RIGHT, buff=0.14)
-        seq_group.next_to(final_lbl, RIGHT, buff=0.3)
- 
-        # Animate chips + dots appearing in order
+        seq_group.next_to(final_lbl, DOWN, buff=0.18).to_edge(LEFT, buff=0.5)
+
         for mob in seq_group:
             if isinstance(mob, Dot):
-                self.play(FadeIn(mob), run_time=0.2)
+                self.play(FadeIn(mob), run_time=0.5)
             else:
-                self.play(FadeIn(mob, scale=0.9), run_time=0.4)
-        self.wait(0.5)
+                self.play(FadeIn(mob, scale=0.9), run_time=0.5)
+        self.wait(0.8)
  
         # ── Takeaway ──────────────────────────────────────────────────────────
         takeaway = Text(
@@ -956,14 +882,12 @@ class SequenceAssembly(Scene):
         )
         takeaway.next_to(seq_group, DOWN, buff=0.32).to_edge(LEFT, buff=0.5)
         self.play(FadeIn(takeaway, shift=UP * 0.1))
-        self.wait(1.2)
+        self.wait(1.5)
  
         # ── Cleanup + advance bar ─────────────────────────────────────────────
         content = VGroup(
             heading, purpose, ex_lbl,
             step1_lbl, cap_chip, arrow_cap, lower_chip, cap_note,
-            step2_lbl, pieces,
-            step3_lbl, glue_note,
             final_lbl, seq_group,
             takeaway,
         )
@@ -972,8 +896,195 @@ class SequenceAssembly(Scene):
         bar_done = pipeline_bar(active=4, done={0, 1, 2, 3})
         div_done = Line(LEFT * 6.8, RIGHT * 6.8, stroke_color=BORDER, stroke_width=1
                         ).next_to(bar_done, DOWN, buff=0.18)
-        self.play(Transform(bar, bar_done), Transform(div, div_done), run_time=0.5)
+        self.play(Transform(bar, bar_done), Transform(div, div_done), run_time=0.6)
         self.wait(0.8)
+
+
+# SECTION: BPE Fallback
+class BPEFallback(Scene):
+    def construct(self):
+        self.camera.background_color = BG
+ 
+        bar = pipeline_bar(active=4, done={0, 1, 2, 3})
+        div = Line(LEFT * 6.8, RIGHT * 6.8, stroke_color=BORDER, stroke_width=1
+                   ).next_to(bar, DOWN, buff=0.18)
+        self.add(bar, div)
+ 
+        # ── Header ────────────────────────────────────────────────────────────
+        heading = Text("Phase 5: BPE Fallback", font="Consolas",
+                       font_size=24, color=YELLOW)
+        heading.next_to(div, DOWN, buff=0.25).to_edge(LEFT, buff=0.5)
+ 
+        purpose = Text(
+            "Goal: safety net for words not in the Tagalog dictionary (OOV)",
+            font="Consolas", font_size=14, color=MUTED
+        )
+        purpose.next_to(heading, DOWN, buff=0.10).to_edge(LEFT, buff=0.5)
+ 
+        self.play(FadeIn(heading), FadeIn(purpose), run_time=0.5)
+        self.wait(0.3)
+ 
+        # ── Helper ────────────────────────────────────────────────────────────
+        def token_chip(text, col, bg_col=PANEL, extra_w=0.0):
+            w = len(text) * 0.165 + 0.5 + extra_w
+            box = RoundedRectangle(
+                corner_radius=0.1, width=w, height=0.44,
+                fill_color=bg_col, fill_opacity=1,
+                stroke_color=col, stroke_width=1.8
+            )
+            lbl = Text(text, font="Consolas", font_size=16, color=col)
+            lbl.move_to(box)
+            return VGroup(box, lbl)
+ 
+        # ── Two trigger examples side-by-side ─────────────────────────────────
+        def example_badge(text, col):
+            box = RoundedRectangle(corner_radius=0.15, width=3.0, height=0.52,
+                                   fill_color=PANEL, fill_opacity=1,
+                                   stroke_color=col, stroke_width=2)
+            lbl = Text(text, font="Consolas", font_size=15, color=col)
+            lbl.move_to(box)
+            return VGroup(box, lbl)
+ 
+        b_eng = example_badge('"Bluetooth"  — English', ORANGE)
+        b_noun = example_badge('"Juan"  — Proper noun', ACCENT)
+        b_slang = example_badge('"charot"  — Slang', PURPLE)
+ 
+        triggers = VGroup(b_eng, b_noun, b_slang)
+        triggers.arrange(RIGHT, buff=0.28)
+        triggers.next_to(purpose, DOWN, buff=0.28).to_edge(LEFT, buff=0.5)
+ 
+        trigger_lbl = Text("Triggers:", font="Consolas", font_size=13, color=MUTED)
+        trigger_lbl.next_to(purpose, DOWN, buff=0.35).to_edge(LEFT, buff=0.5)
+        triggers.next_to(trigger_lbl, RIGHT, buff=0.3)
+ 
+        self.play(FadeIn(trigger_lbl))
+        for b in triggers:
+            self.play(FadeIn(b, scale=0.92), run_time=0.7)
+        self.wait(0.8)
+ 
+        # ── Three-step flow ───────────────────────────────────────────────────
+        ex_div = Line(LEFT * 6.3, RIGHT * 6.3, stroke_color=BORDER, stroke_width=1)
+        ex_div.next_to(triggers, DOWN, buff=0.28).to_edge(LEFT, buff=0.5)
+        ex_lbl = Text('Example:  "Bluetooth"',
+                      font="Consolas", font_size=16, color=YELLOW)
+        ex_lbl.next_to(ex_div, DOWN, buff=0.18).to_edge(LEFT, buff=0.5)
+        self.play(FadeIn(ex_div), FadeIn(ex_lbl), run_time=0.4)
+        self.wait(0.2)
+ 
+        # Step 1 – Dictionary check
+        s1_lbl = Text("Step 1 — Dictionary check",
+                      font="Consolas", font_size=14, color=MUTED)
+        s1_lbl.next_to(ex_lbl, DOWN, buff=0.25).to_edge(LEFT, buff=0.5)
+ 
+        dict_chip  = token_chip("Tagalog Dict", ACCENT, "#0C2A4A")
+        word_chip  = token_chip('"Bluetooth"',  YELLOW, PANEL)
+        cross_chip = token_chip("NOT FOUND",    ORANGE, "#2A1000")
+ 
+        dict_row = VGroup(word_chip, dict_chip, cross_chip)
+        dict_row.arrange(RIGHT, buff=0.3)
+        dict_row.next_to(s1_lbl, DOWN, buff=0.16).to_edge(LEFT, buff=0.5)
+ 
+        a1 = Arrow(word_chip.get_right(), dict_chip.get_left(),
+                   buff=0.08, stroke_width=2, color=BORDER,
+                   max_tip_length_to_length_ratio=0.3)
+        a2 = Arrow(dict_chip.get_right(), cross_chip.get_left(),
+                   buff=0.08, stroke_width=2, color=ORANGE,
+                   max_tip_length_to_length_ratio=0.3)
+ 
+        self.play(FadeIn(s1_lbl))
+        self.play(FadeIn(word_chip), run_time=0.6)
+        self.play(GrowArrow(a1), FadeIn(dict_chip), run_time=0.6)
+        self.play(GrowArrow(a2), FadeIn(cross_chip, scale=0.9), run_time=0.5)
+        self.wait(0.6)
+ 
+        # Step 2 – Bypass / abort
+        s2_lbl = Text("Step 2 — Bypass: skip all Tagalog grammar rules",
+                      font="Consolas", font_size=14, color=MUTED)
+        s2_lbl.next_to(dict_row, DOWN, buff=0.28).to_edge(LEFT, buff=0.5)
+ 
+        bypass_chip = token_chip("ABORT tagging", ORANGE, "#2A1000")
+        bypass_chip.next_to(s2_lbl, DOWN, buff=0.16).to_edge(LEFT, buff=0.5)
+ 
+        self.play(FadeIn(s2_lbl))
+        self.play(FadeIn(bypass_chip, scale=0.9), run_time=0.6)
+        self.wait(0.8)
+ 
+        # Step 3 – Statistical BPE chops word into subwords
+        s3_lbl = Text("Step 3 — Statistical BPE splits into subword chunks",
+                      font="Consolas", font_size=14, color=MUTED)
+        s3_lbl.next_to(bypass_chip, DOWN, buff=0.28).to_edge(LEFT, buff=0.5)
+ 
+        self.play(FadeIn(s3_lbl), run_time=0.5)
+        self.wait(0.6)
+ 
+        # Animate BPE splitting: "Bluetooth" → [Blue] [tooth]
+        intact = token_chip('"Bluetooth"', YELLOW, PANEL)
+        intact.next_to(s3_lbl, DOWN, buff=0.22).to_edge(LEFT, buff=0.5)
+ 
+        c_blue  = token_chip("[Blue]",  ACCENT,  "#0C2A4A")
+        c_tooth = token_chip("[tooth]", PURPLE,  "#1E0A2A")
+        result_row = VGroup(c_blue, c_tooth)
+        result_row.arrange(RIGHT, buff=0.18)
+ 
+        split_arrow = Arrow(
+            intact.get_right() + RIGHT * 0.1,
+            intact.get_right() + RIGHT * 0.9,
+            buff=0.05, stroke_width=2.5, color=YELLOW,
+            max_tip_length_to_length_ratio=0.3
+        )
+        result_row.next_to(split_arrow, RIGHT, buff=0.1)
+ 
+        # secondary split example for very unknown words
+        alt_lbl  = Text("or for very rare words:", font="Consolas",
+                        font_size=12, color=MUTED)
+        c_bl  = token_chip("[Bl]",   ACCENT,  "#0C2A4A")
+        c_ue  = token_chip("[ue]",   PURPLE,  "#1E0A2A")
+        c_too = token_chip("[too]",  SUCCESS, "#0A2010")
+        c_th  = token_chip("[th]",   YELLOW,  PANEL)
+        alt_row = VGroup(c_bl, c_ue, c_too, c_th)
+        alt_row.arrange(RIGHT, buff=0.12)
+ 
+        alt_lbl.next_to(intact, DOWN, buff=0.30).to_edge(LEFT, buff=0.5)
+        alt_row.next_to(alt_lbl, RIGHT, buff=0.2)
+ 
+        self.play(FadeIn(intact), run_time=0.5)
+        self.play(GrowArrow(split_arrow), run_time=0.6)
+        self.play(FadeIn(c_blue, shift=RIGHT * 0.1),
+                  FadeIn(c_tooth, shift=RIGHT * 0.1), run_time=0.7)
+        self.wait(0.5)
+        self.play(FadeIn(alt_lbl), run_time=0.5)
+        for c in alt_row:
+            self.play(FadeIn(c, scale=0.9), run_time=0.6)
+        self.wait(1.3)
+ 
+        # ── Takeaway ──────────────────────────────────────────────────────────
+        takeaway = Text(
+            "No word ever crashes the pipeline — OOV is always handled gracefully",
+            font="Consolas", font_size=14, color=SUCCESS
+        )
+        takeaway.next_to(alt_row, DOWN, buff=0.30).to_edge(LEFT, buff=0.5)
+        self.play(FadeIn(takeaway, shift=UP * 0.1))
+        self.wait(1.8)
+ 
+        # ── Cleanup + mark all steps done ────────────────────────────────────
+        content = VGroup(
+            heading, purpose,
+            trigger_lbl, triggers,
+            ex_div, ex_lbl,
+            s1_lbl, dict_row, a1, a2,
+            s2_lbl, bypass_chip,
+            s3_lbl,
+            intact, split_arrow, result_row,
+            alt_lbl, alt_row,
+            takeaway,
+        )
+        self.play(FadeOut(content))
+ 
+        bar_done = pipeline_bar(active=4, done={0, 1, 2, 3, 4})
+        div_done = Line(LEFT * 6.8, RIGHT * 6.8, stroke_color=BORDER, stroke_width=1
+                        ).next_to(bar_done, DOWN, buff=0.18)
+        self.play(Transform(bar, bar_done), Transform(div, div_done), run_time=0.6)
+        self.wait(1.0)
 
 
 
@@ -1008,3 +1119,11 @@ class SeqAssemblyOnly(Scene):
                    ).next_to(bar, DOWN, buff=0.18)
         self.add(bar, div)
         SequenceAssembly.construct(self)
+
+class BPEFallbackOnly(Scene):
+    def construct(self):
+        bar = pipeline_bar(active=2, done={0, 1})
+        div = Line(LEFT*6.8, RIGHT*6.8, stroke_color=BORDER, stroke_width=1
+                   ).next_to(bar, DOWN, buff=0.18)
+        self.add(bar, div)
+        BPEFallback.construct(self)
