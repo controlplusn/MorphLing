@@ -550,6 +550,258 @@ class Caching(Scene):
         self.wait(0.8)
 
 
+# ── Scene 3 – Morphological Tagging ──────────────────────────────────────────
+class MorphTagging(Scene):
+    def construct(self):
+        self.camera.background_color = BG
+ 
+        bar = pipeline_bar(active=2, done={0, 1})
+        div = Line(LEFT*6.8, RIGHT*6.8, stroke_color=BORDER, stroke_width=1
+                   ).next_to(bar, DOWN, buff=0.18)
+        self.add(bar, div)
+ 
+        # SECTION: Morph Header
+        heading = Text("Phase 3: Morphological Tagging", font="Consolas",
+                       font_size=24, color=SUCCESS)
+        heading.next_to(div, DOWN, buff=0.25).to_edge(LEFT, buff=0.5)
+ 
+        purpose = Text(
+            "Goal: replace stripped affixes with special tokens so the LLM keeps grammar",
+            font="Consolas", font_size=14, color=MUTED
+        )
+        purpose.next_to(heading, DOWN, buff=0.10).to_edge(LEFT, buff=0.5)
+ 
+        self.play(FadeIn(heading), FadeIn(purpose), run_time=0.5)
+        self.wait(0.5)
+
+        # Overview badge
+        def badge(text, col, w=3.6):
+            box = RoundedRectangle(corner_radius=0.15, width=w, height=0.52,
+                                   fill_color=PANEL, fill_opacity=1,
+                                   stroke_color=col, stroke_width=2)
+            lbl = Text(text, font="Consolas", font_size=15, color=col)
+            lbl.move_to(box)
+            return VGroup(box, lbl)
+ 
+        s1 = badge("Step 1: Strip word -> find root", ACCENT)
+        s2 = badge("Step 2: BPE-encode root", PURPLE)
+        s3 = badge("Step 3: Affixes -> special tokens", ORANGE)
+ 
+        s1.next_to(purpose, DOWN, buff=0.28).to_edge(LEFT, buff=0.5)
+        a12 = Arrow(s1.get_right(), s1.get_right() + RIGHT*0.4,
+                    buff=0.05, stroke_width=2, color=BORDER,
+                    max_tip_length_to_length_ratio=0.3)
+        s2.next_to(a12, RIGHT, buff=0.05)
+        a23 = Arrow(s2.get_right(), s2.get_right() + RIGHT*0.4,
+                    buff=0.05, stroke_width=2, color=BORDER,
+                    max_tip_length_to_length_ratio=0.3)
+        s3.next_to(a23, RIGHT, buff=0.05)
+ 
+        # NOTE: Fixed transition time for a smoother transition
+        self.play(FadeIn(s1, shift=RIGHT * 0.2), run_time=0.8)
+        self.wait(0.6)
+        self.play(GrowArrow(a12), FadeIn(s2), run_time=0.8)
+        self.wait(0.6)
+        self.play(GrowArrow(a23), FadeIn(s3), run_time=0.8)
+        self.wait(1.3)
+
+        # Divider line
+        ex_div = Line(LEFT*6.3, RIGHT*6.3, stroke_color=BORDER, stroke_width=1)
+        ex_div.next_to(s1, DOWN, buff=0.30).to_edge(LEFT, buff=0.5)
+ 
+        ex_lbl = Text('Example word:  "tinatawagan"',
+                      font="Consolas", font_size=17, color=YELLOW)
+        ex_lbl.next_to(ex_div, DOWN, buff=0.20).to_edge(LEFT, buff=0.5)
+
+        # NOTE: Slower transition time
+        self.play(FadeIn(ex_div), FadeIn(ex_lbl), run_time=0.4)
+        self.wait(1.2)
+
+        # SECTION: Strip -> root
+        self.play(s1[0].animate.set_stroke(color=WHITE, width=3), run_time=0.5)
+        self.wait(0.8)
+ 
+        # Layout: prefix/infix markers + root + suffix, left-aligned
+        strip_label = Text("Stripping:", font="Consolas", font_size=15, color=MUTED)
+        strip_label.next_to(ex_lbl, DOWN, buff=0.28).to_edge(LEFT, buff=0.5)
+ 
+        # Build the decomposition visually as colored tokens in a row
+        def token_chip(text, col, bg_col):
+            box = RoundedRectangle(corner_radius=0.1, width=len(text)*0.18+0.4,
+                                   height=0.42,
+                                   fill_color=bg_col, fill_opacity=1,
+                                   stroke_color=col, stroke_width=1.8)
+            lbl = Text(text, font="Consolas", font_size=16, color=col)
+            lbl.move_to(box)
+            return VGroup(box, lbl)
+ 
+        chip_in = token_chip("-in-",   ORANGE,  "#2A1A00")   # infix
+        chip_redup = token_chip("ta-",   PURPLE,  "#1E0A2A")   # reduplication
+        chip_root = token_chip("tawag",  SUCCESS, "#0A2010")   # root
+        chip_suf = token_chip("-an",    YELLOW,  "#2A1E00")   # suffix
+ 
+        decomp_row = VGroup(chip_in, chip_redup, chip_root, chip_suf)
+        decomp_row.arrange(RIGHT, buff=0.18)
+        decomp_row.next_to(strip_label, RIGHT, buff=0.3)
+ 
+        # Labels below each chip
+        lbl_in = Text("infix",   font="Consolas", font_size=12, color=ORANGE)
+        lbl_redup = Text("redup",   font="Consolas", font_size=12, color=PURPLE)
+        lbl_root = Text("root",    font="Consolas", font_size=12, color=SUCCESS)
+        lbl_suf = Text("suffix",  font="Consolas", font_size=12, color=YELLOW)
+ 
+        lbl_in.next_to(chip_in,    DOWN, buff=0.08)
+        lbl_redup.next_to(chip_redup, DOWN, buff=0.08)
+        lbl_root.next_to(chip_root,  DOWN, buff=0.08)
+        lbl_suf.next_to(chip_suf,   DOWN, buff=0.08)
+ 
+        chip_labels = VGroup(lbl_in, lbl_redup, lbl_root, lbl_suf)
+ 
+        self.play(FadeIn(strip_label), run_time=0.5)
+        for chip, lbl in zip(decomp_row, chip_labels):
+            self.play(FadeIn(chip, shift=UP*0.1), FadeIn(lbl), run_time=0.6)
+            self.wait(0.5)
+ 
+        self.play(s1[0].animate.set_stroke(color=ACCENT, width=2), run_time=0.5)
+        self.wait(0.8)
+ 
+        # SECTION: BPE Encode root
+        self.play(s2[0].animate.set_stroke(color=WHITE, width=3), run_time=0.5)
+        self.wait(0.2)
+ 
+        bpe_label = Text("BPE encodes root:", font="Consolas", font_size=15, color=MUTED)
+        bpe_label.next_to(strip_label, DOWN, buff=0.65).to_edge(LEFT, buff=0.5)
+ 
+        # Arrow from root chip down to BPE result
+        bpe_arrow = Arrow(
+            start=chip_root.get_bottom(),
+            end=chip_root.get_bottom() + DOWN * 0.55,
+            buff=0.05, stroke_width=2, color=SUCCESS,
+            max_tip_length_to_length_ratio=0.35
+        )
+ 
+        # "tawag" is common -> kept as single token
+        bpe_result = token_chip("[tawag]", SUCCESS, "#0A2010")
+        bpe_result.next_to(bpe_label, RIGHT, buff=0.3)
+ 
+        bpe_note = Text("common root -> kept as 1 token",
+                        font="Consolas", font_size=13, color=MUTED)
+        bpe_note.next_to(bpe_result, RIGHT, buff=0.3)
+ 
+        self.play(GrowArrow(bpe_arrow), run_time=0.5)
+        self.play(FadeIn(bpe_label), FadeIn(bpe_result), run_time=0.4)
+        self.play(FadeIn(bpe_note), run_time=0.8)
+        self.play(s2[0].animate.set_stroke(color=PURPLE, width=2), run_time=0.5)
+        self.wait(0.8)
+ 
+        # SECTION: Affixes -> special tokens
+        self.play(s3[0].animate.set_stroke(color=WHITE, width=3), run_time=0.5)
+        self.wait(0.2)
+ 
+        tag_label = Text("Affixes -> tokens:", font="Consolas", font_size=15, color=MUTED)
+        tag_label.next_to(bpe_label, DOWN, buff=0.55).to_edge(LEFT, buff=0.5)
+ 
+        # Map chips to their special tokens
+        tag_map = [
+            (chip_in,    "##INFIX",  ORANGE),
+            (chip_redup, "##REDUP",  PURPLE),
+            (chip_suf,   "##SUFFIX", YELLOW),
+        ]
+ 
+        tag_chips = VGroup()
+        tag_arrows = VGroup()
+        for src_chip, tag_txt, col in tag_map:
+            tc = token_chip(tag_txt, col, PANEL)
+            ta = Arrow(
+                start=src_chip.get_bottom(),
+                end=tc.get_top(),
+                buff=0.08, stroke_width=1.8, color=col,
+                max_tip_length_to_length_ratio=0.3
+            )
+            tag_chips.add(tc)
+            tag_arrows.add(ta)
+ 
+        tag_chips.arrange(RIGHT, buff=0.3)
+        tag_chips.next_to(tag_label, RIGHT, buff=0.3)
+ 
+        # Reposition arrows now that tag_chips are placed
+        for i, (src_chip, tag_txt, col) in enumerate(tag_map):
+            tag_arrows[i].become(Arrow(
+                start=src_chip.get_bottom(),
+                end=tag_chips[i].get_top(),
+                buff=0.08, stroke_width=1.5, color=col,
+                max_tip_length_to_length_ratio=0.3
+            ))
+ 
+        self.play(FadeIn(tag_label), run_time=0.6)
+        for tc, ta in zip(tag_chips, tag_arrows):
+            self.play(GrowArrow(ta), FadeIn(tc, shift=DOWN*0.1), run_time=0.8)
+            self.wait(0.3)
+ 
+        self.play(s3[0].animate.set_stroke(color=ORANGE, width=2), run_time=0.5)
+        self.wait(0.8)
+ 
+        # ── Final assembled token sequence ────────────────────────────────────
+        final_label = Text("Final token sequence:", font="Consolas",
+                           font_size=15, color=MUTED)
+        final_label.next_to(tag_label, DOWN, buff=0.55).to_edge(LEFT, buff=0.5)
+ 
+        # Tokens in order: ##INFIX, ##REDUP, [tawag], ##SUFFIX
+        f1 = token_chip("##INFIX",  ORANGE, PANEL)
+        f2 = token_chip("##REDUP",  PURPLE, PANEL)
+        f3 = token_chip("[tawag]",  SUCCESS, "#0A2010")
+        f4 = token_chip("##SUFFIX", YELLOW, PANEL)
+ 
+        final_seq = VGroup(f1, f2, f3, f4)
+        final_seq.arrange(RIGHT, buff=0.22)
+        final_seq.next_to(final_label, RIGHT, buff=0.3)
+ 
+        # Small connector arrows between final tokens
+        conn_arrows = VGroup()
+        for i in range(len(final_seq) - 1):
+            ca = Arrow(
+                final_seq[i].get_right(), final_seq[i+1].get_left(),
+                buff=0.06, stroke_width=1.5, color=BORDER,
+                max_tip_length_to_length_ratio=0.4
+            )
+            conn_arrows.add(ca)
+ 
+        self.play(FadeIn(final_label), run_time=0.8)
+        self.wait(0.3)  
+        for ft in final_seq:
+            self.play(FadeIn(ft, scale=0.9), run_time=0.5)
+        self.play(*[GrowArrow(ca) for ca in conn_arrows], run_time=0.6)
+        self.wait(0.8)
+ 
+        # Takeaway
+        takeaway = Text(
+            "Grammar is preserved as tokens — the LLM sees structure, not just characters",
+            font="Consolas", font_size=14, color=SUCCESS
+        )
+        takeaway.next_to(final_label, DOWN, buff=0.38).to_edge(LEFT, buff=0.5)
+        self.play(FadeIn(takeaway, shift=UP*0.1))
+        self.wait(1.5)
+ 
+        # ── cleanup + advance bar ─────────────────────────────────────────────
+        content = VGroup(
+            heading, purpose,
+            s1, a12, s2, a23, s3,
+            ex_div, ex_lbl,
+            strip_label, decomp_row, chip_labels,
+            bpe_arrow, bpe_label, bpe_result, bpe_note,
+            tag_label, tag_chips, tag_arrows,
+            final_label, final_seq, conn_arrows,
+            takeaway,
+        )
+        self.play(FadeOut(content))
+ 
+        bar_done = pipeline_bar(active=3, done={0, 1, 2})
+        div_done = Line(LEFT*6.8, RIGHT*6.8, stroke_color=BORDER, stroke_width=1
+                        ).next_to(bar_done, DOWN, buff=0.18)
+        self.play(Transform(bar, bar_done), Transform(div, div_done), run_time=0.5)
+        self.wait(0.8)
+
+
 
 # ── Combined render target ────────────────────────────────────────────────────
 class FullPipeline(Scene):
@@ -565,3 +817,11 @@ class CachingOnly(Scene):
                    ).next_to(bar, DOWN, buff=0.18)
         self.add(bar, div)
         Caching.construct(self)
+
+class MorphTaggingOnly(Scene):
+    def construct(self):
+        bar = pipeline_bar(active=2, done={0, 1})
+        div = Line(LEFT*6.8, RIGHT*6.8, stroke_color=BORDER, stroke_width=1
+                   ).next_to(bar, DOWN, buff=0.18)
+        self.add(bar, div)
+        MorphTagging.construct(self)
