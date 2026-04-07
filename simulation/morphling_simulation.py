@@ -1095,6 +1095,8 @@ class FullPipeline(Scene):
         Normalization.construct(self)
         Caching.construct(self)
         MorphTagging.construct(self)
+        SequenceAssembly.construct(self)
+        BPEFallback.construct(self)
 
 class CachingOnly(Scene):
     def construct(self):
